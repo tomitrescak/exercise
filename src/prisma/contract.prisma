@@ -1,0 +1,179 @@
+// use prisma-8
+
+enum RoutineFormat {
+  @@type("pg/text@1")
+  CIRCUIT       = "CIRCUIT"
+  STRAIGHT_SETS = "STRAIGHT_SETS"
+}
+
+enum SessionStatus {
+  @@type("pg/text@1")
+  IN_PROGRESS = "IN_PROGRESS"
+  COMPLETED   = "COMPLETED"
+  ABANDONED   = "ABANDONED"
+}
+
+// Single-user app: exactly one row with id "me".
+model UserProfile {
+  id                String             @id
+  displayName       String?
+  ageYears          Int?
+  sex               String?
+  weightKg          Float?
+  heightCm          Float?
+  experienceLevel   String             @default("intermediate")
+  primaryGoal       String             @default("general_health")
+  focusNotes        String?
+  equipment         Jsonb
+  sessionMaxMinutes Int                @default(30)
+  sessionsPerWeek   Int                @default(3)
+  healthConstraints String?
+  benchmarks        Jsonb?
+  updatedAt         temporal.UpdatedAt
+}
+
+model Routine {
+  id                   String             @id @onCreate(cuid(2))
+  name                 String
+  description          String?
+  goal                 String
+  format               RoutineFormat
+  rounds               Int                @default(1)
+  restBetweenRoundsSec Int                @default(90)
+  estimatedMinutes     Int
+  coachNotes           String?
+  rating               Jsonb?
+  parentId             String?
+  archived             Boolean            @default(false)
+  starred              Boolean            @default(false)
+  exercises            RoutineExercise[]
+  sessions             WorkoutSession[]
+  createdAt            temporal.CreatedAt
+  updatedAt            temporal.UpdatedAt
+
+  @@index([archived])
+}
+
+model RoutineExercise {
+  id               String   @id @onCreate(cuid(2))
+  routineId        String
+  routine          Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  position         Int
+  name             String
+  movementPattern  String
+  primaryMuscles   String[]
+  equipment        String?
+  loadKg           Float?
+  sets             Int
+  repsMin          Int?
+  repsMax          Int?
+  durationSec      Int?
+  perSide          Boolean  @default(false)
+  tempo            String?
+  restSec          Int      @default(60)
+  targetRir        Int?
+  cues             String[]
+  safetyNotes      String?
+  youtubeVideoId   String
+  youtubeTitle     String
+  youtubeChannel   String
+  videoDurationSec Int?
+  videoVerifiedAt  DateTime
+
+  @@unique([routineId, position])
+  @@index([routineId])
+}
+
+model Conversation {
+  id               String             @id @onCreate(cuid(2))
+  routineId        String?
+  title            String?
+  draft            Jsonb?
+  draftVersion     Int                @default(0)
+  draftHistory     Jsonb              @default(json`[]`)
+  verifiedVideoIds String[]
+  savedRoutineIds  String[]
+  messages         Message[]
+  createdAt        temporal.CreatedAt
+  updatedAt        temporal.UpdatedAt
+
+  @@index([routineId])
+}
+
+model Message {
+  id             String             @id @onCreate(cuid(2))
+  conversationId String
+  conversation   Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String
+  toolCalls      Jsonb?
+  sources        Jsonb?
+  draftVersion   Int?
+  createdAt      temporal.CreatedAt
+
+  @@index([conversationId])
+}
+
+model WorkoutSession {
+  id                String        @id @onCreate(cuid(2))
+  routineId         String
+  routine           Routine       @relation(fields: [routineId], references: [id])
+  routineSnapshot   Jsonb
+  status            SessionStatus
+  startedAt         DateTime
+  endedAt           DateTime?
+  pausedAt          DateTime?
+  pausedTotalSec    Int           @default(0)
+  activeDurationSec Int?
+  cursor            Jsonb
+  perceivedExertion Int?
+  notes             String?
+  sets              SetLog[]
+
+  @@index([routineId])
+  @@index([status])
+}
+
+model SetLog {
+  id           String         @id @onCreate(cuid(2))
+  sessionId    String
+  session      WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId   String
+  exerciseName String
+  round        Int
+  setIndex     Int
+  side         String         @default("")
+  targetReps   Int?
+  actualReps   Int?
+  loadKg       Float?
+  durationSec  Int?
+  skipped      Boolean        @default(false)
+  completedAt  DateTime
+
+  @@unique([sessionId, exerciseId, round, setIndex, side])
+  @@index([sessionId])
+}
+
+model VideoCache {
+  videoId     String   @id
+  title       String
+  channel     String
+  durationSec Int
+  embeddable  Boolean
+  isPublic    Boolean
+  verifiedAt  DateTime
+}
+
+// Photo of the day: one per local calendar date. Replacing a day's photo creates a new row (new id),
+// so image URLs keyed by id can be cached forever.
+model Photo {
+  id        String             @id @onCreate(cuid(2))
+  takenOn   String             @unique // YYYY-MM-DD
+  caption   String?
+  mimeType  String
+  width     Int
+  height    Int
+  data      Bytes
+  thumb     Bytes
+  createdAt temporal.CreatedAt
+}
