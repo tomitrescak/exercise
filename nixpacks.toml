@@ -6,7 +6,7 @@ NEXT_TELEMETRY_DISABLED = "1"
 # Enabled in setup so it still works when the platform overrides the install command.
 [phases.setup]
 nixPkgs = ["nodejs_22", "openssl"]
-cmds = ["npm install -g corepack@latest && corepack enable"]
+cmds = ["npm install -g corepack@0.34 && corepack enable"]
 
 [phases.install]
 cmds = ["pnpm install --frozen-lockfile"]
