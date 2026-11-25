@@ -2,20 +2,19 @@
 COREPACK_ENABLE_DOWNLOAD_PROMPT = "0"
 NEXT_TELEMETRY_DISABLED = "1"
 
-# Only Node from nix; pnpm comes from corepack using "packageManager" in package.json
+# Only Node from nix; pnpm comes from corepack using "packageManager" in package.json.
+# Enabled in setup so it still works when the platform overrides the install command.
 [phases.setup]
 nixPkgs = ["nodejs_22", "openssl"]
+cmds = ["npm install -g corepack@latest && corepack enable"]
 
 [phases.install]
-cmds = [
-  "npm install -g corepack@latest && corepack enable",
-  "pnpm install --frozen-lockfile",
-]
+cmds = ["pnpm install --frozen-lockfile"]
 
 [phases.build]
-cmds = ["pnpm contract:emit", "pnpm build"]
+cmds = ["pnpm build"]
 
-# Bring the database schema in line with the contract, then start.
-# Destructive changes are refused (the deploy fails) rather than applied.
+# "build" emits the Prisma contract first; "start" runs `prisma db update` first
+# (destructive schema changes are refused rather than applied).
 [start]
-cmd = "pnpm exec prisma db update --yes && pnpm start"
+cmd = "pnpm start"
